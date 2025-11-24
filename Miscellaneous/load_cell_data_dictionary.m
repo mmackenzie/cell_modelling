@@ -1,7 +1,7 @@
 clear; close all;
 
-params_path = 'C:\Users\mmackenzie\OneDrive - ZELEROS GLOBAL S.L\Documents\MATLAB\cell_modelling\LG_78Ah';
-dictionary_path = 'C:\STAYON_git\dictionaries';
+params_path = 'C:\Users\mmackenzie\OneDrive - ZELEROS GLOBAL S.L\Zeleros - Zeleros\Operaciones\4- E-drive\05- Projects\Meridian\05_Engineering_Design\02_Module\00_Cell\02_Modelling\Updated_parameters';
+dictionary_path = 'C:\cell_modelling\Estimators';
 params_file = 'RC_params.xlsx';
 dictionary_file = 'CellDictionary.sldd';
 
@@ -9,10 +9,10 @@ dd = Simulink.data.dictionary.open(fullfile(dictionary_path, dictionary_file));
 dataSection = getSection(dd, 'Design Data');
 
 % Load OCV & RC parameters
-% raw_data = readmatrix(fullfile(params_path, 'OCV_orig.xlsx'), 'Sheet', '100SOH');
-% data.OCV_SOC = raw_data(2:end, 1);
-% data.OCV_T = raw_data(1, 2:end);
-% data.OCV_V = raw_data(2:end, 2:end);
+raw_data = readmatrix(fullfile(params_path, 'OCV.xlsx'), 'Sheet', 'Averaged');
+data.OCV_SOC = raw_data(2:end, 1);
+data.OCV_T = raw_data(1, 2:end);
+data.OCV_V = raw_data(2:end, 2:end);
 
 raw_data = readmatrix(fullfile(params_path, params_file), 'Sheet', 'R0_discharge');
 data.ECM_SOC = raw_data(1, 2:end);

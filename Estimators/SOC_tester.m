@@ -16,9 +16,9 @@ capacity_Ah = 115.8;
 % Ts = 1;
 data.Ts = 1;
 data.soc_estim_init = 0.5;  % Initial estimate for SOC
-data.initial_covariance = [0.2 1e-6 1e-5 1e-4];  % Uncertainty in initial state estimate [SOC V1 V2 V3]
-data.state_covariance = diag([1e-10, 1e-8, 1e-8, 1e-8]);  % Uncertainty in battery model (diagonal matrix) [SOC V1 V2 V3]
-data.measurement_covariance = 0.0001;  % Representing noise in voltage sensor (std^2)
+data.initial_covariance = [0.02 0.00001 0.0001 0.001];  % P0, uncertainty in initial state estimate [SOC V1 V2 V3]
+data.state_covariance = diag([1e-8, 1e-5, 1e-4, 1e-3]);  % Q, uncertainty in battery model (diagonal matrix) [SOC V1 V2 V3]
+data.measurement_covariance = 0.0001;  % R, representing noise in voltage sensor (std^2)
 
 %% Update estimator parameters
 dd = Simulink.data.dictionary.open(fullfile(dictionary_path, estimators_dictionary_file));
