@@ -5,11 +5,18 @@ function [soc_bins, temperature_bins, cal_hist, cyc_hist, time_summary] = profil
 
     profile = readtable(filename);
 
-    time = profile.Time_s_;  % [s]
-    current = profile.CellCurrent_A_;  % [A]
-    soc = min(profile.SOC___, 100);  % [%]
-    temperature = profile.CellTemperature;  % [°C]
-    mode = profile.Mode;  % 'Charge'/'Discharge'/'Storage'
+    % time = profile.Time_s_;  % [s]
+    % current = profile.CellCurrent_A_;  % [A]
+    % soc = min(profile.SOC___, 100);  % [%]
+    % temperature = profile.CellTemperature;  % [°C]
+    % mode = profile.Mode;  % 'Charge'/'Discharge'/'Storage'
+    % c_rate = current / Q_nom;
+
+    time = profile.time;  % [s]
+    current = profile.batt_current;  % [A]
+    soc = max(min(profile.soc*100, 100), 0);  % [%]
+    temperature = profile.temperature_M1;  % [°C]
+    mode = profile.mode;  % 'Charge'/'Discharge'/'Storage'
     c_rate = current / Q_nom;
 
     [~, name, ~] = fileparts(filename);

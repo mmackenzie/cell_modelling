@@ -1,69 +1,56 @@
-%% Parameters for Estimate Battery State of Health Based on Capacity Fade
+clear; clc; close all;
 
-open_system('BatteryCapacityEstimation')
+% input_folder = 'C:\Users\mmackenzie\ZELEROS GLOBAL S.L\Zeleros - Zeleros\Operaciones\4- E-drive\05- Projects\Courage\02_SE\03_Testing_&_Validations\Caracterización_Eléctrica_Termica\01_Results\03_HPPC\10';
+% filename = 'ME-ITE-250223-04_HPPCTest @10oC.xlsx';
+% output_folder = 'C:\Users\mmackenzie\ZELEROS GLOBAL S.L\Zeleros - Zeleros\Operaciones\4- E-drive\05- Projects\Courage\02_SE\03_Testing_&_Validations\Caracterización_Eléctrica_Termica\02_Analysis\01_Plots';
+% soc_init = 0.31;
 
-set_param(find_system('BatteryCapacityEstimation','FindAll', 'on','type','annotation','Tag','ModelFeatures'),'Interpreter','off')
+dictionary_path = 'C:\cell_modelling\Estimators';
+estimators_dictionary_file = 'TestDictionary.sldd';
 
-% Code to plot simulation results from BatteryCapacityEstimationExample
-%% Plot Description:
-%
-% This plot shows the real and estimated battery state of charge, 
-% estimated capacity, and estimated state of health of the battery.
+capacity_Ah = 115.8;
+data.Ts = 1;
+data.T_init = 298.15;
+data.soc_init = 0.2;
+data.upper_soc = 0.95;
+data.lower_soc = 0.05;
+% SOC estimator
+data.soc_estim_init = 0.5;  % Initial estimate for SOC
+data.initial_covariance = [0.2 1e-7 1e-6 1e-5];  % P0, uncertainty in initial state estimate [SOC V1 V2 V3]
+data.state_covariance = diag([1e-10, 1e-7, 1e-6, 1e-5]);  % Q, uncertainty in battery model (diagonal matrix) [SOC V1 V2 V3]
+data.measurement_covariance = 0.0001;  % R, representing noise in voltage sensor (std^2)
 
-% Copyright 2023 The MathWorks, Inc.
+% SOH estimator
+data.cap_initial_covariance = 1e-8;  % EKF
+data.cap_measurement_covariance = 5e-7;  % EKF
+data.cap_process_covariance = 3e-6;  % EKF
 
-% Generate simulation results if they don't exist
-if ~exist('BatteryCapacityEstimationSimlog', 'var') || ... 
-        get_param('BatteryCapacityEstimation','RTWModifiedTimeStamp') ~= double(simscape.logging.timestamp(BatteryCapacityEstimationSimlog))
-    sim('BatteryCapacityEstimation')
-    % Model StopFcn callback adds a timestamp to the Simscape simulation data log
+data.cap_forgetting_factor = 0.9;  % least squares
+data.cap_soc_change_threshold = 0.05;  % least squares
+data.cap_current_measurement_variance = 1e-8;  % least squares
+
+%% Update estimator parameters
+dd = Simulink.data.dictionary.open(fullfile(dictionary_path, estimators_dictionary_file));
+dataSection = getSection(dd, 'Design Data');
+
+varNames = fieldnames(data);
+varValues = struct2cell(data);
+for i = 1:length(varNames)
+    varName = varNames{i};
+    varValue = varValues{i};
+    try
+        % Try to get the existing entry
+        entry = getEntry(dataSection, varName);
+        % Update the value if the entry exists
+        setValue(entry, Simulink.Parameter(varValue));
+    catch
+        % If the entry does not exist, add a new one
+        addEntry(dataSection, varName, Simulink.Parameter(varValue));
+    end
 end
 
-% Reuse figure if it exists, else create new figure
-if ~exist('h1_BatteryCapacityEstimation', 'var') || ...
-        ~isgraphics(h1_BatteryCapacityEstimation, 'figure')
-    h1_BatteryCapacityEstimation = figure('Name', 'BatteryCapacityEstimation');
-end
-figure(h1_BatteryCapacityEstimation)
-clf(h1_BatteryCapacityEstimation)
+saveChanges(dd);
+close(dd);
 
-% Get simulation results
-simlog_SOC_real = BatteryCapacityEstimationLogsout.get('real_soc');
-simlog_SOC_est = BatteryCapacityEstimationLogsout.get('est_soc');
-simlog_SOH_est = BatteryCapacityEstimationLogsout.get('est_soh');
-simlog_Cap_real = BatteryCapacityEstimationLogsout.get('real_cap');
-simlog_Cap_est = BatteryCapacityEstimationLogsout.get('est_cap');
-
-% Plot results
-simlog_handles(1) = subplot(3, 1, 1);
-plot(simlog_SOC_real.Values.Time/3600, simlog_SOC_real.Values.Data(:)*100, 'LineWidth', 1)
-hold on
-plot(simlog_SOC_est.Values.Time/3600, simlog_SOC_est.Values.Data(:)*100, 'LineWidth', 1)
-hold off
-grid on
-title('State of Charge')
-ylabel('SOC (%)')
-xlabel('Time (hours)')
-legend({'Real','Estimated'},'Location','Best');
-simlog_handles(1) = subplot(3, 1, 2);
-plot(simlog_Cap_real.Values.Time/3600, simlog_Cap_real.Values.Data(:), 'LineWidth', 1)
-hold on
-plot(simlog_Cap_est.Values.Time/3600, simlog_Cap_est.Values.Data(:), 'LineWidth', 1)
-hold off
-grid on
-title('Battery Capacity')
-ylabel('Capacity (A*hr)')
-xlabel('Time (hours)')
-legend({'Real','Estimated'},'Location','Best');
-simlog_handles(1) = subplot(3, 1, 3);
-plot(simlog_SOH_est.Values.Time/3600, simlog_SOH_est.Values.Data(:)*100, 'LineWidth', 1)
-grid on
-title('State of Health')
-ylabel('SOH (%)')
-xlabel('Time (hours)')
-
-linkaxes(simlog_handles, 'x')  
-
-% Remove temporary variables
-clear simlog_SOC_real simlog_SOC_est simlog_Cap_real simlog_Cap_est 
-clear simlog_SOH_est simlog_handles
+simOut = sim('test_SOC_SOH', 'SrcWorkspace', 'base');
+% estimated_soc = simOut.estimated_soc;

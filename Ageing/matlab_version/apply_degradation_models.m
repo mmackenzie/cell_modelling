@@ -56,7 +56,7 @@ function [SOH_traj, Q_loss_calendar, Q_loss_cycling, time_axis, cycle_axis] = ap
                         T_mid = mean(T_edges(iT:iT+1));
         
                         % cumulative cycles for this bin
-                        N_prev = f_cyc_x(p_cal, Q_loss_total, T_mid, R); 
+                        N_prev = f_cyc_x(p_cyc, Q_loss_total, T_mid, R); 
                         N_new = N_prev + dN;
                         total_cycles = total_cycles + dN;
         
@@ -105,3 +105,5 @@ end
 function N = f_cyc_x(p, Q_loss, T_degC, R)
     N = (Q_loss / (p(1) .* exp(-p(2) / (R * (T_degC + 273.15))))) .^ (1 / 0.9);
 end
+
+

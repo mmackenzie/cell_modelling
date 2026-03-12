@@ -1,16 +1,21 @@
 clear; clc; close all;
 
 RPT_file_path = 'C:\Users\mmackenzie\OneDrive - ZELEROS GLOBAL S.L\Zeleros - Zeleros\Operaciones\4- E-drive\05- Projects\Meridian\05_Engineering_Design\02_Module\00_Cell\02_Modelling\Cell_ageing_RPT_data.xlsx';
-customer_path = 'C:\Users\mmackenzie\OneDrive - ZELEROS GLOBAL S.L\Documents\MATLAB\cell_modelling\Ageing\Customer_profiles';
-customers = {'Gotion_116Ah_1_cycle_per_day_Seville', 'Gotion_116Ah_300cycles_per_year_30degC_ambient', 'Gotion_116Ah_300cycles_per_year_25degC_ambient', ...
-    'Gotion_116Ah_300cycles_per_year_20degC_ambient', 'Gotion_116Ah_300cycles_per_year_25degC_5degC_std_dev', 'Gotion_116Ah_300cycles_per_year_25degC_10degC_std_dev', ...
-    'Gotion_116Ah_300cycles_per_year_25degC_15degC_std_dev', 'Gotion_116Ah_600cycles_per_year_20degC_1degC_std_dev', 'Gotion_116Ah_600cycles_per_year_25degC_1degC_std_dev', ...
-    'Gotion_116Ah_600cycles_per_year_30degC_1degC_std_dev', 'Gotion_116Ah_600cycles_per_year_25degC_5degC_std_dev', 'Gotion_116Ah_600cycles_per_year_25degC_10degC_std_dev', ...
-    'Gotion_116Ah_600cycles_per_year_25degC_15degC_std_dev', 'Gotion_116Ah_100cycles_per_year_20degC_1degC_std', 'Gotion_116Ah_100cycles_per_year_25degC_1degC_std', ...
-    'Gotion_116Ah_100cycles_per_year_30degC_1degC_std', 'Gotion_116Ah_100cycles_per_year_25degC_5degC_std', 'Gotion_116Ah_100cycles_per_year_25degC_10degC_std', ...
-    'Gotion_116Ah_100cycles_per_year_25degC_15degC_std'}';
+% gotion_life_estimation_path = 'C:\Users\mmackenzie\OneDrive - ZELEROS GLOBAL S.L\Zeleros - Zeleros\Operaciones\4- E-drive\05- Projects\Meridian\05_Engineering_Design\02_Module\00_Cell\01_Info received from Gotion\Life_estimations.xlsx';
+% customer_path = 'C:\Users\mmackenzie\OneDrive - ZELEROS GLOBAL S.L\Documents\MATLAB\cell_modelling\Ageing\Customer_profiles';
+% customers = {'Gotion_116Ah_1_cycle_per_day_Seville', 'Gotion_116Ah_300cycles_per_year_30degC_ambient', 'Gotion_116Ah_300cycles_per_year_25degC_ambient', ...
+%     'Gotion_116Ah_300cycles_per_year_20degC_ambient', 'Gotion_116Ah_300cycles_per_year_25degC_5degC_std_dev', 'Gotion_116Ah_300cycles_per_year_25degC_10degC_std_dev', ...
+%     'Gotion_116Ah_300cycles_per_year_25degC_15degC_std_dev', 'Gotion_116Ah_600cycles_per_year_20degC_1degC_std_dev', 'Gotion_116Ah_600cycles_per_year_25degC_1degC_std_dev', ...
+%     'Gotion_116Ah_600cycles_per_year_30degC_1degC_std_dev', 'Gotion_116Ah_600cycles_per_year_25degC_5degC_std_dev', 'Gotion_116Ah_600cycles_per_year_25degC_10degC_std_dev', ...
+%     'Gotion_116Ah_600cycles_per_year_25degC_15degC_std_dev', 'Gotion_116Ah_100cycles_per_year_20degC_1degC_std', 'Gotion_116Ah_100cycles_per_year_25degC_1degC_std', ...
+%     'Gotion_116Ah_100cycles_per_year_30degC_1degC_std', 'Gotion_116Ah_100cycles_per_year_25degC_5degC_std', 'Gotion_116Ah_100cycles_per_year_25degC_10degC_std', ...
+%     'Gotion_116Ah_100cycles_per_year_25degC_15degC_std'}';
+
+customer_path = 'C:\Users\mmackenzie\OneDrive - ZELEROS GLOBAL S.L\Documents\Synthetic data\Yearly profiles';
+customers = {'battery_01', 'battery_02', 'battery_03', 'battery_04', 'battery_05', 'battery_06', 'battery_07', 'battery_08'}';
+output_folder = 'C:\Users\mmackenzie\OneDrive - ZELEROS GLOBAL S.L\Documents\Synthetic data\Life estimations';
+
 n_customers = length(customers);
-gotion_life_estimation_path = 'C:\Users\mmackenzie\OneDrive - ZELEROS GLOBAL S.L\Zeleros - Zeleros\Operaciones\4- E-drive\05- Projects\Meridian\05_Engineering_Design\02_Module\00_Cell\01_Info received from Gotion\Life_estimations.xlsx';
 nominal_capacity = 115.8;  % Ah
 R = 8.314;  % J/(mol*K)
 SOC_ref = 100;  % Reference SOC for calendar ageing
@@ -27,12 +32,12 @@ Q_loss_calendar = cell(n_customers, 1);
 Q_loss_cycling = cell(n_customers, 1);
 time_axis = cell(n_customers, 1);
 cycle_axis = cell(n_customers, 1);
-years_75 = nan(n_customers,1);
-years_70 = nan(n_customers,1);
-cycles_75 = nan(n_customers,1);
-cycles_70 = nan(n_customers,1);
-pct_cycling = nan(n_customers,1);
-pct_storage = nan(n_customers,1);
+years_75 = nan(n_customers, 1);
+years_70 = nan(n_customers, 1);
+cycles_75 = nan(n_customers, 1);
+cycles_70 = nan(n_customers, 1);
+pct_cycling = nan(n_customers, 1);
+pct_storage = nan(n_customers, 1);
 for i = 1:n_customers
     customer_profile_path = fullfile(customer_path, sprintf('%s.csv', string(customers(i))));
     [SOC_edges, T_edges, cal_hist, cyc_hist, time_summary] = profile_to_histograms(customer_profile_path, nominal_capacity);
@@ -94,6 +99,7 @@ ylabel('SOH [%]');
 grid on; ylim([69 100]);
 title('SOH prediction vs time');
 legend();
+saveas(gcf, fullfile(output_folder, "SOH_predictions_vs_time.png"));
 
 figure;
 hold on;
@@ -105,3 +111,4 @@ ylabel('SOH [%]');
 grid on; ylim([69 100]);
 title('SOH prediction vs cycles');
 legend();
+saveas(gcf, fullfile(output_folder, "SOH_predictions_vs_cycles.png"));

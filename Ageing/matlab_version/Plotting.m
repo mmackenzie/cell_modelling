@@ -117,7 +117,7 @@ classdef Plotting
             grid on;
 
             t_extrap = (0:30:5*365)'; % up to 5 years
-            SOC_levels = [10, 30, 50, 70, 90, 100];
+            SOC_levels = [30, 50, 70, 90, 100];
             T_plot = 25;  % Fixed reference temperature (25°C)
             
             figure; hold on;
@@ -129,10 +129,33 @@ classdef Plotting
                 plot(t_extrap/365, Q_pred_SOC, 'Color', colors(i,:), 'LineWidth', 1.5, ...
                     'DisplayName', sprintf('SOC = %d%%', SOC_val));
             end
-            xlabel('Years'); ylabel('Relative capacity (%)');
-            title(sprintf('Calendar ageing at %d°C as a function of SOC', T_plot));
+            xlabel('Años'); ylabel('SOH (%)');
+            % title(sprintf('Calendar ageing at %d°C as a function of SOC', T_plot));
+            % title(sprintf('Envejecimiento en almacenamiento a %d°C en función del SOC', T_plot));
             grid on;
             ylim([80 100]);
+            legend('Location', 'best');
+        end
+
+        function plot_calendar_T_dependency(p_cal, f_cal, SOC_ref)
+            t_extrap = (0:30:5*365)'; % up to 5 years
+            SOC_plot = SOC_ref;  % Fixed reference SOC (100%)
+            T_levels = [10, 20, 30, 40, 50];
+            
+            figure; hold on;
+            colors = lines(numel(T_levels));
+            for i = 1:numel(T_levels)
+                T_val = T_levels(i);
+                Qloss_T = f_cal(p_cal, [t_extrap T_val*ones(size(t_extrap)) SOC_plot*ones(size(t_extrap))]);
+                Q_pred_T = 100 - Qloss_T;
+                plot(t_extrap/365, Q_pred_T, 'Color', colors(i,:), 'LineWidth', 1.5, ...
+                    'DisplayName', sprintf('T = %d°C', T_val));
+            end
+            xlabel('Años'); ylabel('SOH (%)');
+            % title(sprintf('Calendar ageing at %d%% SOC as a function of temperature', SOC_plot));
+            % title(sprintf('Envejecimiento en almacenamiento a %d%% SOC en función de la temperatura', SOC_plot));
+            grid on;
+            ylim([70 100]);
             legend('Location', 'best');
         end
 

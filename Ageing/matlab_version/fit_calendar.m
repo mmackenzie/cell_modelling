@@ -27,16 +27,17 @@ function calendar_model = fit_calendar(storage_data, R, SOC_ref)
     Q_pred = 100 - Qloss_pred;
 
     % Goodness of fit
-    rmse = sqrt(mean((Q_pred - Q_all).^2));
-    R2 = 1 - sum((Q_pred - Q_all).^2) / sum((Q_all - mean(Q_all)).^2);
+    rmse = sqrt(mean((Q_pred - Q_all) .^ 2));
+    R2 = 1 - sum((Q_pred - Q_all) .^ 2) / sum((Q_all - mean(Q_all)) .^ 2);
 
     % Pack results
     calendar_model.params = p;
-    calendar_model.rmse   = rmse;
-    calendar_model.R2     = R2;
+    calendar_model.rmse = rmse;
+    calendar_model.R2 = R2;
 
     % Plot
     Plotting.plot_fit(Q_all, Q_pred, 'Calendar ageing', rmse, R2);
     Plotting.plot_calendar_extrapolation(storage_data, p, f_cal);
     Plotting.plot_calendar_soc_dependency(p, f_cal, SOC_ref);
+    Plotting.plot_calendar_T_dependency(p, f_cal, SOC_ref);
 end
