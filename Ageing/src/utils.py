@@ -172,7 +172,7 @@ def plot_calendar_extrapolation(storage_data: Dict,
                                 p_cal: Sequence[float],
                                 physics_func: Callable,
                                 t_extrap_days: Optional[np.ndarray] = None,
-                                figsize=(8, 5),
+                                figsize=(16, 10),
                                 savepath: Optional[str] = None):
     """
     Overlay measured storage data with extrapolated model lines.
@@ -187,15 +187,18 @@ def plot_calendar_extrapolation(storage_data: Dict,
 
     i = 0
     for key, d in storage_data.items():
-        days = np.asarray(d["day"])
-        rel = np.asarray(d["relative_capacity"])
+        cell_n = 1
+        for cell_id, relative_capacities in d["relative_capacity"].items():
+            days = np.asarray(d["day"][:len(relative_capacities)])
+            rel = np.asarray(relative_capacities)
+            c = default_colours[i % len(default_colours)]
+            plt.plot(days / 365.0, rel, marker='*', linestyle='None', color=c, label=f"{key}_{cell_n} - measured", markersize=6)
+            cell_n += 1
         T = float(d["temperature"])
         SOC = float(d.get("soc", np.nan))
-        c = default_colours[i % len(default_colours)]
-        plt.plot(days / 365.0, rel, marker='*', linestyle='None', color=c, label=f"{int(T)}°C - measured", markersize=6)
         Qloss = physics_func(p_cal, t_extrap_days, T, SOC)
         Qpred = 100.0 - Qloss
-        plt.plot(t_extrap_days / 365.0, Qpred, linestyle='--', color=c, linewidth=1.3, label=f"{int(T)}°C - estimated")
+        plt.plot(t_extrap_days / 365.0, Qpred, linestyle='--', color=c, linewidth=1.3, label=f"{key} - estimated")
         i += 1
 
     plt.xlabel("Years")
@@ -203,7 +206,8 @@ def plot_calendar_extrapolation(storage_data: Dict,
     plt.title("Measured vs extrapolated storage data")
     plt.ylim([70, 100])
     plt.grid(True, linestyle="--", alpha=0.5)
-    plt.legend(loc="best")
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize="small")
+    plt.tight_layout()
     if savepath:
         plt.savefig(savepath, dpi=300)
     # plt.show()
@@ -214,6 +218,7 @@ def plot_calendar_extrapolation(storage_data: Dict,
 # ---------------------------------------------------------------------
 def plot_cycling_extrapolation(cycling_data: Dict,
                                p_cyc: Sequence[float],
+                               model_type: str,
                                physics_func: Callable,
                                N_extrap: Optional[np.ndarray] = None,
                                figsize=(16, 10),
@@ -232,7 +237,7 @@ def plot_cycling_extrapolation(cycling_data: Dict,
     for key, d in cycling_data.items():
         cell_n = 1
         for cell_id, relative_capacities in d["relative_capacity"].items():
-            cycles = np.asarray(d["cycle"][:len(relative_capacities)])
+            cycles = np.asarray(d["fce"][:len(relative_capacities)])
             rel = np.asarray(relative_capacities)
             c = default_colours[i % len(default_colours)]
             plt.plot(cycles, rel, marker='*', linestyle='None', color=c, label=f"{key}_{cell_n} - measured", markersize=6)
@@ -242,12 +247,15 @@ def plot_cycling_extrapolation(cycling_data: Dict,
         C_discharge = float(d["discharge_crate"])
         SOC_lower = float(d["soc_lower"])
         SOC_upper = float(d["soc_upper"])
-        Qloss = physics_func(p_cyc, N_extrap, T, C_charge, C_discharge, SOC_lower, SOC_upper)
+        if model_type == "simple":
+            Qloss = physics_func(p_cyc, N_extrap, T)
+        else:
+            Qloss = physics_func(p_cyc, N_extrap, T, C_charge, C_discharge, SOC_lower, SOC_upper)
         Qpred = 100.0 - Qloss
         plt.plot(N_extrap, Qpred, linestyle='--', color=c, linewidth=1.5, label=f"{key} - estimated")
         i += 1
 
-    plt.xlabel("Cycles")
+    plt.xlabel("Full cycle equivalents (FCE)")
     plt.ylabel("Relative capacity (%)")
     plt.title("Measured vs extrapolated cycling data")
     plt.ylim([70, 100])

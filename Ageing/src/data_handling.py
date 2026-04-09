@@ -77,7 +77,7 @@ class DataHandler:
 
             # Write sheets with cell cycling data
             for sheet, df_list in grouped.items():
-                final_df = pd.concat(df_list).pivot(index='Cycle', columns='Cell_ID', values='Rel_Cap')
+                final_df = pd.concat(df_list).pivot(index='FCE', columns='Cell_ID', values='Rel_Cap')
                 final_df.to_excel(writer, sheet_name=sheet)
                 worksheet = writer.sheets[sheet]
                 for i, col in enumerate(final_df.reset_index().columns):
@@ -151,10 +151,10 @@ class DataHandler:
                 for cell in cells:
                     df = pd.DataFrame(self._get_relative_capacity_data(cell, interval=10))
                     if not df.empty:
-                        plt.plot(df["Cycle"], df["Rel_Cap"], marker="o", label=cell["cell_id"])
+                        plt.plot(df["FCE"], df["Rel_Cap"], marker="o", label=cell["cell_id"])
 
                 plt.title(f"Capacity Fade: {condition}", fontweight="bold")
-                plt.xlabel("Cycle Number")
+                plt.xlabel("Full cycle equivalents (FCE)")
                 plt.ylabel("Relative Capacity (%)")
                 plt.ylim(70, 101)
                 plt.grid(True, alpha=0.3)
@@ -204,16 +204,16 @@ class DataHandler:
             if any(skip in sheet_lower for skip in ["cell_characteristics", "cleaning_summary"]):
                 continue
 
-            df = pd.read_excel(xls, sheet_name=sheet)
-            sheet_key = re.sub(r"[^0-9a-zA-Z_]", "_", sheet)
-            sheet_clean = sheet.replace("-", "_")
-
             # Identify storage vs cycling
             is_storage = "storage" in sheet_lower or "calendar" in sheet_lower
 
             # Temperature extraction
-            temp_match = re.search(r"(\d+)\s*(?=degC)", sheet_clean, flags=re.IGNORECASE)
+            temp_match = re.search(r"(-?\d+)\s*(?=degc)", sheet_lower)
             temperature = float(temp_match.group(1)) if temp_match else None
+
+            df = pd.read_excel(xls, sheet_name=sheet)
+            sheet_key = re.sub(r"[^0-9a-zA-Z_]", "_", sheet)
+            sheet_clean = sheet.replace("-", "_")
 
             # --- STORAGE SHEET FORMAT: "Storage_100SOC_25degC" ---
             if is_storage:
@@ -253,12 +253,12 @@ class DataHandler:
                 )
 
                 df.columns = [c.strip() for c in df.columns]
-                cycle_col = next((c for c in df.columns if "cycle" in c.lower()), None)
+                cycle_col = next((c for c in df.columns if "fce" in c.lower()), None)
                 if cycle_col is None:
                     print(f"⚠️ No 'Cycle' column found in cycling sheet '{sheet}' — skipped.")
                     continue
 
-                cap_cols = [c for c in df.columns if c.lower() != "cycle"]
+                cap_cols = [c for c in df.columns if c.lower() != "fce"]
 
                 cycling_data[sheet_key] = {
                     "temperature": temperature,
@@ -266,7 +266,7 @@ class DataHandler:
                     "discharge_crate": discharge_crate,
                     "soc_lower": soc_lower,
                     "soc_upper": soc_upper,
-                    "cycle": df[cycle_col].to_numpy(),
+                    "fce": df[cycle_col].to_numpy(),
                     "relative_capacity": {
                         cell_id: df[cell_id].to_numpy()
                         for cell_id in cap_cols
@@ -299,16 +299,16 @@ class DataHandler:
         N_all, T_all, SOC_lower_all, SOC_upper_all, charge_rate_all, discharge_rate_all, Q_all = [], [], [], [], [], [], []
         for d in cycling_data.values():
             for relative_capacities in d["relative_capacity"].values():
-                N_all.extend(d["cycle"][:len(relative_capacities)])
-                T_all.extend([d["temperature"]] * len(d["cycle"][:len(relative_capacities)]))
-                SOC_lower_all.extend([d["soc_lower"]] * len(d["cycle"][:len(relative_capacities)]))
-                SOC_upper_all.extend([d["soc_upper"]] * len(d["cycle"][:len(relative_capacities)]))
-                charge_rate_all.extend([d["charge_crate"]] * len(d["cycle"][:len(relative_capacities)]))
-                discharge_rate_all.extend([d["discharge_crate"]] * len(d["cycle"][:len(relative_capacities)]))
+                N_all.extend(d["fce"][:len(relative_capacities)])
+                T_all.extend([d["temperature"]] * len(d["fce"][:len(relative_capacities)]))
+                SOC_lower_all.extend([d["soc_lower"]] * len(d["fce"][:len(relative_capacities)]))
+                SOC_upper_all.extend([d["soc_upper"]] * len(d["fce"][:len(relative_capacities)]))
+                charge_rate_all.extend([d["charge_crate"]] * len(d["fce"][:len(relative_capacities)]))
+                discharge_rate_all.extend([d["discharge_crate"]] * len(d["fce"][:len(relative_capacities)]))
                 Q_all.extend(relative_capacities)
 
         cycling_data_df = pd.DataFrame({
-            "Cycle": np.asarray(N_all),
+            "FCE": np.asarray(N_all),
             "Temperature": np.asarray(T_all),
             "Charge_C-rate": np.asarray(charge_rate_all),
             "Discharge_C-rate": np.asarray(discharge_rate_all),
@@ -450,21 +450,39 @@ class DataHandler:
         """Helper to extract capacity every N cycles."""
         results = []
         baseline_cap = None
+        discharge_cap_throughput = 0
+        charge_cap_throughput = 0
+        
+        soc_interval = cell.get("SOC_interval")
+        if soc_interval is not None and len(soc_interval) == 2:
+            # Convert to % and round sensibly
+            soc_low = int(round(soc_interval[0] * 100))
+            soc_high = int(round(soc_interval[1] * 100))
+            dod = soc_high - soc_low 
+        else:
+            dod = 100
         
         cycles = cell.get('cycle_data', [])
         for cyc in cycles:
+            discharge_caps = cyc.get('discharge_capacity_in_Ah', [])
+            current_discharge_cap = np.max(discharge_caps) if discharge_caps else 0
+            discharge_cap_throughput += current_discharge_cap
+
+            charge_caps = cyc.get('charge_capacity_in_Ah', [])
+            current_charge_cap = np.max(charge_caps) if charge_caps else 0
+            charge_cap_throughput += current_charge_cap
+
             n = cyc.get('cycle_number')
-            if n % interval == 0:
-                caps = cyc.get('discharge_capacity_in_Ah', [])
-                current_cap = np.max(caps) if caps else 0
-                
+            fce = n * dod / 100
+            if n % interval == 0:                
                 if n == 0 or baseline_cap is None:
-                    baseline_cap = current_cap
-                
-                rel_cap = (current_cap / baseline_cap * 100) if baseline_cap > 0 else 0
+                    baseline_cap = current_discharge_cap
+                rel_cap = (current_discharge_cap / baseline_cap * 100) if baseline_cap > 0 else 0
                 results.append({
                     'Cell_ID': cell['cell_id'],
-                    'Cycle': n,
+                    'FCE': round(fce, 1),
+                    'Discharge_Capacity_Throughput': round(discharge_cap_throughput, 2),
+                    'Charge_Capacity_Throughput': round(charge_cap_throughput, 2),
                     'Rel_Cap': round(rel_cap, 2)
                 })
         return results
@@ -600,7 +618,7 @@ class DataCleaner:
             sheet_outliers = 0
 
             for col in df.columns:
-                if col.lower() == "cycle":
+                if col.lower() == "fce":
                     continue
 
                 y = df[col].astype(float)
@@ -705,15 +723,15 @@ class DataCleaner:
                 df_orig = self.sheets[sheet_name]
 
                 plt.figure(figsize=(10, 6))
-                color_cycle = plt.cm.tab10(np.linspace(0, 1, len([c for c in df_clean.columns if c.lower() != "cycle"])))
+                color_cycle = plt.cm.tab10(np.linspace(0, 1, len([c for c in df_clean.columns if c.lower() != "fce"])))
 
-                for idx, col in enumerate([c for c in df_clean.columns if c.lower() != "cycle"]):
+                for idx, col in enumerate([c for c in df_clean.columns if c.lower() != "fce"]):
                     color = color_cycle[idx % len(color_cycle)]
-                    plt.plot(df_orig["Cycle"], df_orig[col], color=color, marker="o", alpha=0.3)
-                    plt.plot(df_clean["Cycle"], df_clean[col], color=color, marker="o", label=col)
+                    plt.plot(df_orig["FCE"], df_orig[col], color=color, marker="o", alpha=0.3)
+                    plt.plot(df_clean["FCE"], df_clean[col], color=color, marker="o", label=col)
 
                 plt.title(f"Capacity Fade (Cleaned): {sheet_name}", fontweight="bold")
-                plt.xlabel("Cycle Number")
+                plt.xlabel("Full cycle equivalents (FCE)")
                 plt.ylabel("Relative Capacity (%)")
                 plt.ylim(70, 101)
                 plt.grid(True, alpha=0.3)
@@ -727,20 +745,23 @@ class DataCleaner:
 
 if __name__ == "__main__":
     ROUTE_FOLDER = r"C:\BatteryLife\dataset"
-    DATASET = r"Stanford"
-    DATASET_FOLDER = rf"C:\BatteryLife\dataset\{DATASET}"
-    EXCEL_FILE = f"{DATASET}.xlsx".replace("\\", "_")
-    PDF_FILE = f"{DATASET}.pdf".replace("\\", "_")
-    # handler = DataHandler(ROUTE_FOLDER, DATASET_FOLDER)
-    # handler.load_pickle_folder()
-    # handler.export_to_excel(EXCEL_FILE)
-    # handler.export_to_pdf(PDF_FILE)
+    DATASETS = [r"ISU_ILCC\batch1"]
+    # DATASETS = [r"ISU_ILCC\batch1", r"MATR\batch2", r"MATR\batch3", r"MATR\batch4", "MICH", "MICH_EXP", "RWTH", "SDU",
+    #             "SNL_LFP", "SNL_NCA", "SNL_NMC", "Stanford", r"Tongji\Tongji1", r"Tongji\Tongji2", r"Tongji\Tongji3", "UL_PUR", "XJTU"]
+    for DATASET in DATASETS:
+        DATASET_FOLDER = rf"C:\BatteryLife\dataset\{DATASET}"
+        EXCEL_FILE = f"{DATASET}.xlsx".replace("\\", "_")
+        PDF_FILE = f"{DATASET}.pdf".replace("\\", "_")
+        handler = DataHandler(ROUTE_FOLDER, DATASET_FOLDER)
+        handler.load_pickle_folder()
+        handler.export_to_excel(EXCEL_FILE)
+        handler.export_to_pdf(PDF_FILE)
 
-    cleaner = DataCleaner(
-        input_excel=os.path.join(DATASET_FOLDER, EXCEL_FILE),
-        output_folder=DATASET_FOLDER
-        )
+        cleaner = DataCleaner(
+            input_excel=os.path.join(DATASET_FOLDER, EXCEL_FILE),
+            output_folder=DATASET_FOLDER
+            )
 
-    cleaner.remove_outliers()
-    cleaner.save_cleaned_data(os.path.join(DATASET_FOLDER, f"{DATASET}_cleaned.xlsx".replace("\\", "_")))
-    cleaner.plot_cleaned_pdf(os.path.join(DATASET_FOLDER, f"{DATASET}_cleaned.pdf".replace("\\", "_")))
+        cleaner.remove_outliers()
+        cleaner.save_cleaned_data(os.path.join(DATASET_FOLDER, f"{DATASET}_cleaned.xlsx".replace("\\", "_")))
+        cleaner.plot_cleaned_pdf(os.path.join(DATASET_FOLDER, f"{DATASET}_cleaned.pdf".replace("\\", "_")))

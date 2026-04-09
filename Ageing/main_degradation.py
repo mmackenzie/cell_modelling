@@ -11,12 +11,15 @@ from src.utils import plot_SOH_trajectory
 
 
 def main_degradation(
+    dataset:str,
     rpt_path: str,
     rpt_file: str,
+    model_path: str,
     customer_path: str,
-    output_folder: str,
+    output_path: str,
     batteries: list[str],
-    nominal_capacity: float = 115.8,
+    nominal_capacity: float,
+    cycling_model_type: str
 ):
     """
     Main degradation workflow:
@@ -38,16 +41,17 @@ def main_degradation(
         Rated capacity [Ah].
     """
 
-    os.makedirs(output_folder, exist_ok=True)
+    os.makedirs(output_path, exist_ok=True)
     n_customers = len(batteries)
 
     # --- Load RPT data ---
-    reader = DataHandler()
-    storage_data, cycling_data = reader.read_RPT_data(rpt_path, rpt_file)
+    data_handler = DataHandler()
+    storage_data, cycling_data = data_handler.read_RPT_data(rpt_path, rpt_file)
+    storage_data_df, cycling_data_df = data_handler.convert_data_to_df(storage_data, cycling_data)
 
     # --- Data fitter ---
-    fitter = DegradationModelFitter()
-    model_params = fitter.fit_degradation_models(storage_data, cycling_data)
+    fitter = DegradationModelFitter(dataset, model_path, output_path)
+    model_params = fitter.fit_degradation_models(storage_data_df, cycling_data_df, cycling_model_type)
 
     # --- Predictor ---
     predictor = DegradationPredictor(model_params)
@@ -59,14 +63,14 @@ def main_degradation(
     for i, batt in enumerate(batteries):
         battery_profile_path = os.path.join(customer_path, f"{batt}.csv")
         generator = ProfileGenerator()
-        soc_bins, temp_bins, cal_hist, cyc_hist, time_summary = generator.profile_to_histograms(battery_profile_path, nominal_capacity)
+        cal_summary, cyc_summary, time_summary = generator.profile_to_summaries(battery_profile_path, nominal_capacity)
 
-        soh, q_loss_cal, q_loss_cyc, time_days, cycles = predictor.apply(cal_hist, cyc_hist, soc_bins, temp_bins)
+        soh, q_loss_cal, q_loss_cyc, time_days, cycles = predictor.apply(cal_summary, cyc_summary)
         q_loss_tot = q_loss_cal + q_loss_cyc
         pct_loss_cal = q_loss_cal / q_loss_tot * 100
         pct_loss_cyc = q_loss_cyc / q_loss_tot * 100
-        pct_time_cal = time_summary["idle"] / time_summary["total"] * 100
-        pct_time_cyc = (time_summary["charge"] + time_summary["discharge"]) / time_summary["total"] * 100
+        pct_time_cal = time_summary["idle_days"] / time_summary["total_days"] * 100
+        pct_time_cyc = (time_summary["charge_days"] + time_summary["discharge_days"]) / time_summary["total_days"] * 100
 
         results.append({
             "Battery": batt,
@@ -80,10 +84,10 @@ def main_degradation(
             "Percent_Calendar_Degradation": pct_loss_cal
         })
 
-        plot_SOH_trajectory(time_days, soh, savepath=os.path.join(output_folder, f"{batt}_SOH_traj.png"))
+        plot_SOH_trajectory(time_days, soh, savepath=os.path.join(output_path, f"{batt}_SOH_traj.png"))
 
     summary = pd.DataFrame(results)
-    summary.to_csv(os.path.join(output_folder, "degradation_summary.csv"), index=False)
+    summary.to_csv(os.path.join(output_path, "degradation_summary.csv"), index=False)
     print("\nSummary:\n", summary.round(1))
 
     return summary
@@ -94,7 +98,11 @@ if __name__ == "__main__":
     RPT_PATH = r"C:\Users\mmackenzie\OneDrive - ZELEROS GLOBAL S.L\Zeleros - Zeleros\Operaciones\4- E-drive\05- Projects\Meridian\05_Engineering_Design\02_Module\00_Cell\02_Modelling"
     RPT_FILE = "Cell_ageing_RPT_data.xlsx"
     PROFILE_PATH = r"C:\Users\mmackenzie\OneDrive - ZELEROS GLOBAL S.L\Documents\Synthetic data\Yearly profiles"
-    OUTPUT_FOLDER = r"C:\Users\mmackenzie\OneDrive - ZELEROS GLOBAL S.L\Documents\Synthetic data\Life estimations"
+    OUTPUT_PATH = r"C:\Users\mmackenzie\OneDrive - ZELEROS GLOBAL S.L\Documents\Synthetic data\Life estimations"
+    MODEL_PATH = r"C:\cell_modelling\Ageing\model_params"
+    DATASET = "Gotion"
+    NOMINAL_CAPACITY = 116 * 4
+    CYCLING_MODEL_TYPE = "simple"
 
     BATTERIES = [
         "battery_01", "battery_02", "battery_03", "battery_04",
@@ -102,9 +110,13 @@ if __name__ == "__main__":
     ]
 
     results = main_degradation(
+        dataset=DATASET,
         rpt_path=RPT_PATH,
         rpt_file=RPT_FILE,
+        model_path=MODEL_PATH,
         customer_path=PROFILE_PATH,
-        output_folder=OUTPUT_FOLDER,
-        batteries=BATTERIES
+        output_path=OUTPUT_PATH,
+        batteries=BATTERIES,
+        nominal_capacity=NOMINAL_CAPACITY,
+        cycling_model_type=CYCLING_MODEL_TYPE
     )
