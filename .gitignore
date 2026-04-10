@@ -1,33 +1,48 @@
-# Autosave files
+# ==========================================
+# PYTHON & ENVIRONMENT
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.env
+.ipynb_checkpoints/
+
+# ==========================================
+# DATASET & LARGE FILES
+# ==========================================
+# Don't commit the actual data you just downloaded!
+BatteryData/
+data/
+*.parquet
+*.csv
+*.zip
+*.tar.gz
+
+# ==========================================
+# MATLAB & SIMULINK
+# ==========================================
 *.asv
 *.m~
 *.autosave
 *.slx.r*
 *.mdl.r*
-
-# Derived content-obscured files
 *.p
-
-# Compiled MEX files
 *.mex*
-
-# Packaged app and toolbox files
 *.mlappinstall
 *.mltbx
-
-# Deployable archives
 *.ctf
-
-# Generated helpsearch folders
 helpsearch*/
-
-# Code generation folders
 slprj/
 sccprj/
 codegen/
-
-# Cache files
 *.slxc
-
-# Cloud based storage dotfile
 .MATLABDriveTag
+
+# ==========================================
+# SYSTEM FILES
+# ==========================================
+.DS_Store
+Thumbs.db
