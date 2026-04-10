@@ -1,0 +1,94 @@
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from DashvoltAnalytics.common.battery_data_handling import ProfileConverter
+
+
+def plot_BMS_state_pcts(df):
+    """Creates a plot of the time percentage that the BMS spends in each state"""
+    # Aggregate hours per week and mode
+    weekly = df.groupby(["week", "mode"], observed=True)["duration_h"].sum().reset_index()
+
+    # Pivot to wide table for stacked bars
+    weekly_pivot = weekly.pivot(index="week", columns="mode", values="duration_h").fillna(0)
+    weekly_pivot = weekly_pivot.sort_index()
+
+    # Convert weekly totals to percentages
+    weekly_pct = weekly_pivot.div(weekly_pivot.sum(axis=1), axis=0) * 100
+
+    # Year summary (hours & percentage per mode)
+    yearly = df.groupby("mode", observed=True)["duration_h"].sum().reset_index()
+    total_hours = yearly["duration_h"].sum()
+    yearly["pct_time"] = yearly["duration_h"] / total_hours * 100
+    yearly = yearly.sort_values("duration_h", ascending=False)
+
+    # Build summary text
+    summary_lines = [f"Total hours: {total_hours:4.1f}h\n"]
+    for _, row in yearly.iterrows():
+        summary_lines.append(f"{row['mode']:<11s}: {row['duration_h']:4.1f}h ({row['pct_time']:2.1f}%)")
+    summary_text = "\n".join(summary_lines)
+
+    # Plot stacked bar chart
+    fig, ax = plt.subplots(figsize=(14, 6))
+    weekly_pct.plot(kind="bar", stacked=True, width=0.9, ax=ax, colormap="tab20")
+
+    ax.set_xlabel("Week of year")
+    ax.set_ylabel("Percentage of time in state (%)")
+    ax.set_title("Weekly percentage of time spent in each BMS state")
+    legend = ax.legend(title="BMS state",
+                    bbox_to_anchor=(1, 1),
+                    loc="upper right",
+                    frameon=True,
+                    facecolor="white",
+                    framealpha=0.9,
+                    edgecolor="gray")
+
+    # Render the figure to compute legend position
+    fig.canvas.draw()
+
+    # Get legend bounding box in axes coordinates
+    legend_bbox = legend.get_window_extent().transformed(ax.transAxes.inverted())
+
+    # Compute text box position directly below legend, same right edge
+    legend_right_x = legend_bbox.x1
+    legend_bottom_y = legend_bbox.y0
+
+    # Add text box just below the legend 
+    props = dict(boxstyle="round,pad=0.4",
+                facecolor="white",
+                alpha=0.9,
+                edgecolor="gray")
+
+    ax.text(
+        legend_right_x, legend_bottom_y - 0.02,  # x ~ right edge, y just below legend
+        summary_text,
+        transform=ax.transAxes,
+        fontsize=10,
+        verticalalignment="top",
+        horizontalalignment="right",
+        multialignment="left",
+        bbox=props,
+        family="monospace"
+    )
+
+    plt.tight_layout()
+    plt.show()
+
+if __name__ == "__main__":
+    PROFILE_PATH = r"C:\Users\mmackenzie\OneDrive - ZELEROS GLOBAL S.L\Documents\Synthetic data\Yearly profiles"
+    NOMINAL_CAPACITY = 116*4
+    BATTERIES = [
+        "battery_01", "battery_02", "battery_03", "battery_04",
+        "battery_05", "battery_06", "battery_07", "battery_08"
+    ]
+
+    for batt in BATTERIES:
+        battery_profile_path = os.path.join(PROFILE_PATH, f"{batt}.csv")
+        profile_converter = ProfileConverter(batt)
+        profile_df = profile_converter.csv_to_df(battery_profile_path)
+        
+        plot_BMS_state_pcts(profile_df)
+
+        print('done')
