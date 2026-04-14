@@ -199,14 +199,17 @@ class ProfileGenerator:
         # plt.show()
 
 class ProfileConverter:
-    def __init__(self, battery_id):
+    def __init__(self, battery_id, batt_capacity):
         self.batt_id = battery_id
+        self.capacity = batt_capacity
 
     def csv_to_df(self, path_to_csv: str):
         df = pd.read_csv(path_to_csv)
         df = df.sort_values("time").reset_index(drop=True)
         df = df[df["time"] <= 365*24*3600]
         df["soc"] = df["soc"].clip(lower=0, upper=1)
+
+        df["C_rate"] = df["batt_current"] / self.capacity
 
         # --- Compute SOC difference between consecutive samples ---
         df["d_soc"] = df["soc"].diff().fillna(0)
