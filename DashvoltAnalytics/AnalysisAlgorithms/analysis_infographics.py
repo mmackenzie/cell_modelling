@@ -212,7 +212,6 @@ def plot_soc_transitions(df: pd.DataFrame, mode_label: str):
     # 2. Plotting
     plt.figure(figsize=(10, 5))
     
-    # Use stat="count" or "percent" for easier interpretation
     sns.histplot(starts["soc"] * 100, bins=10, color='skyblue', 
                  label=f'Start of {mode_label}', alpha=0.7, kde=True)
     sns.histplot(ends["soc"] * 100, bins=10, color='orange', 
@@ -229,9 +228,13 @@ def plot_soc_transitions(df: pd.DataFrame, mode_label: str):
 if __name__ == "__main__":
     PROFILE_PATH = r"C:\Users\mmackenzie\OneDrive - ZELEROS GLOBAL S.L\Documents\Synthetic data\Yearly profiles"
     NOMINAL_CAPACITY = 116*4
-    BATTERIES = [
-        "battery_01", "battery_02", "battery_03", "battery_04",
-        "battery_05", "battery_06", "battery_07", "battery_08"
+    # BATTERIES = [
+    #     "battery_01", "battery_02", "battery_03", "battery_04",
+    #     "battery_05", "battery_06", "battery_07", "battery_08"
+    # ]
+
+    BATTERIES = ["battery_01_resampled", "battery_02_resampled", "battery_03_resampled", "battery_04_resampled",
+                 "battery_05_resampled", "battery_06_resampled", "battery_07_resampled", "battery_08_resampled"
     ]
 
     for batt in BATTERIES:
@@ -240,7 +243,7 @@ if __name__ == "__main__":
         profile_df = profile_converter.csv_to_df(battery_profile_path)
         
         plot_BMS_state_pcts(profile_df)
-        heatmap_time_vs_SOC_and_T(profile_df, model="All")
+        heatmap_time_vs_SOC_and_T(profile_df, mode="All")
         heatmap_time_vs_SOC_and_T(profile_df, mode="Storage")
         heatmap_cycles_vs_Crate_and_T(profile_df)
         plot_soc_transitions(profile_df, "Charge")

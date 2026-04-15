@@ -234,6 +234,64 @@ class ProfileConverter:
 
         return df
 
+    def resample_battery_data(self, path_to_csv: str, start_epoch: int = 1735689600, output_path: str = None):
+        """
+        Forces data onto a strict 5-min grid using interpolation.
+        Works for 1s data (subsampling) and 3600s data (upsampling/interpolating).
+        """
+        df = pd.read_csv(path_to_csv)
+        df = df.sort_values("time").reset_index(drop=True)
+        df = df[df["time"] <= 365*24*3600]
+        df["soc"] = df["soc"].clip(lower=0, upper=1)
+
+        # 1. Identify dynamic columns
+        temp_cols = [c for c in df.columns if c.startswith('temperature_')]
+        volt_cols = [c for c in df.columns if c.startswith('cell_voltages_')]
+        
+        # 2. Setup absolute timeline
+        df['timestamp'] = pd.to_datetime(df['time'] + start_epoch, unit='s')
+        df = df.set_index('timestamp')
+
+        # 3. Create the 5-minute grid
+        # Floor the start and ceil the end to ensure we cover the whole range
+        grid_start = df.index.min().floor('5min')
+        grid_end = df.index.max().ceil('5min')
+        five_min_grid = pd.date_range(start=grid_start, end=grid_end, freq='5min')
+
+        # 4. Union + Interpolate
+        # Reindex to the union of existing timestamps + the 5-min grid
+        df_combined = df.reindex(df.index.union(five_min_grid))
+
+        # Interpolate physical sensors across the new gaps
+        cols_to_interp = ['batt_voltage', 'batt_current', 'soc', 'soh'] + temp_cols + volt_cols
+        df_combined[cols_to_interp] = df_combined[cols_to_interp].interpolate(method='linear')
+        
+        # Forward fill the categorical mode
+        df_combined['mode'] = df_combined['mode'].ffill()
+
+        # 5. Filter to ONLY the 5-minute grid points
+        df_resampled = df_combined.reindex(five_min_grid)
+
+        # 6. Final Formatting and Epoch Conversion
+        df_resampled = df_resampled.reset_index().rename(columns={'index': 'timestamp'})
+        
+        # Create the epoch_time column from the timestamp
+        df_resampled['epoch_time'] = df_resampled['timestamp'].astype('int64') // 10**9
+        df_resampled['time'] = df_resampled['epoch_time'] - df_resampled.loc[0, 'epoch_time']
+        
+        # Drop the temporary columns and keep only epoch_time
+        cols_to_drop = ['time_h', 'timestamp']
+        df_resampled = df_resampled.drop(columns=cols_to_drop, errors='ignore')
+
+        # Set epoch_time as the index
+        df_resampled = df_resampled.set_index('epoch_time')
+
+        # 7. Output to CSV
+        if output_path is not None:
+            df_resampled.to_csv(output_path)
+
+        return df_resampled
+
 if __name__ == "__main__":
     # Example usage
     PROFILE_PATH = r"C:\Users\mmackenzie\OneDrive - ZELEROS GLOBAL S.L\Documents\Synthetic data\Yearly profiles"
@@ -245,5 +303,11 @@ if __name__ == "__main__":
 
     for batt in BATTERIES:
         battery_profile_path = os.path.join(PROFILE_PATH, f"{batt}.csv")
-        generator = ProfileGenerator()
-        cal_summary, cyc_summary, time_summary = generator.profile_to_summaries(battery_profile_path, NOMINAL_CAPACITY)
+        output_path = os.path.join(PROFILE_PATH, f"{batt}_resampled.csv")
+        # generator = ProfileGenerator()
+        # cal_summary, cyc_summary, time_summary = generator.profile_to_summaries(battery_profile_path, NOMINAL_CAPACITY)
+        profile_converter = ProfileConverter(batt, NOMINAL_CAPACITY)
+        resampled_profile_df = profile_converter.resample_battery_data(battery_profile_path, output_path=output_path)
+        profile_df = profile_converter.csv_to_df(output_path)
+
+        print('done')
