@@ -16,6 +16,7 @@ class ProfileGenerator:
         Converts customer usage profile into summary tables using BMS state flags.
         Returns: cal_hist_days (np.array), cyc_summary (pd.DataFrame), time_summary (dict)
         """
+        # df = pd.read_csv(filename, sep=";")
         df = pd.read_csv(filename)
         
         # Standardize columns

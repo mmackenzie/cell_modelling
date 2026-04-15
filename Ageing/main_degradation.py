@@ -7,7 +7,7 @@ from src.data_handling import DataHandler
 from src.fit_degradation_models import DegradationModelFitter
 from src.degradation_predictor import DegradationPredictor
 from src.profile_generator import ProfileGenerator
-from src.utils import plot_SOH_trajectory
+import src.utils as utils
 
 
 def main_degradation(
@@ -37,8 +37,10 @@ def main_degradation(
         Where plots and results will be saved.
     customers : list[str]
         List of customer identifiers (filenames without extension).
-    nominal_capacity : float, optional
+    nominal_capacity : float
         Rated capacity [Ah].
+    cycling_model_type : str
+        Cycling model to use ('simple', 'extended' or 'semi-fixed')
     """
 
     os.makedirs(output_path, exist_ok=True)
@@ -50,8 +52,18 @@ def main_degradation(
     storage_data_df, cycling_data_df = data_handler.convert_data_to_df(storage_data, cycling_data)
 
     # --- Data fitter ---
-    fitter = DegradationModelFitter(dataset, model_path, output_path)
+    fitter = DegradationModelFitter(dataset, output_path)
     model_params = fitter.fit_degradation_models(storage_data_df, cycling_data_df, cycling_model_type)
+
+    save_path = os.path.join(output_path, f"{dataset}_calendar_extrapolation.png")
+    utils.plot_calendar_extrapolation(storage_data, model_params["calendar"]["params"], fitter.physics.extrapolate_calendar, savepath=save_path)
+
+    save_path = os.path.join(output_path, f"{dataset}_cycling_extrapolation.png")
+    if cycling_model_type == "simple":
+        cycling_model = fitter.physics.extrapolate_cycling_simple
+    else:
+        cycling_model = fitter.physics.extrapolate_cycling
+    utils.plot_cycling_extrapolation(cycling_data, model_params["cycling"]["params"], cycling_model_type, cycling_model, savepath=save_path)
 
     # --- Predictor ---
     predictor = DegradationPredictor(model_params)
@@ -84,7 +96,7 @@ def main_degradation(
             "Percent_Calendar_Degradation": pct_loss_cal
         })
 
-        plot_SOH_trajectory(time_days, soh, savepath=os.path.join(output_path, f"{batt}_SOH_traj.png"))
+        utils.plot_SOH_trajectory(time_days, soh, savepath=os.path.join(output_path, f"{batt}_SOH_traj.png"))
 
     summary = pd.DataFrame(results)
     summary.to_csv(os.path.join(output_path, "degradation_summary.csv"), index=False)
@@ -102,12 +114,22 @@ if __name__ == "__main__":
     MODEL_PATH = r"C:\cell_modelling\Ageing\model_params"
     DATASET = "Gotion"
     NOMINAL_CAPACITY = 116 * 4
-    CYCLING_MODEL_TYPE = "simple"
+    CYCLING_MODEL_TYPE = "extended"
+
+    # BATTERIES = [
+    #     "battery_01", "battery_02", "battery_03", "battery_04",
+    #     "battery_05", "battery_06", "battery_07", "battery_08"
+    # ]
 
     BATTERIES = [
-        "battery_01", "battery_02", "battery_03", "battery_04",
-        "battery_05", "battery_06", "battery_07", "battery_08"
+        "battery_01_resampled", "battery_02_resampled", "battery_03_resampled", "battery_04_resampled",
+        "battery_05_resampled", "battery_06_resampled", "battery_07_resampled", "battery_08_resampled"
     ]
+
+    # BATTERIES = [
+    #     "battery_storage_10degC", "battery_storage_25degC", "battery_storage_50degC",
+    #     "battery_cycling_25degC", "battery_cycling_45degC"
+    # ]
 
     results = main_degradation(
         dataset=DATASET,

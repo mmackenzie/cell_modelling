@@ -8,14 +8,13 @@ from .utils import *
 
 class DegradationPredictor:
     """
-    Applies fitted degradation models to customer usage histograms.
+    Applies fitted degradation models to customer usage summaries.
     """
 
     def __init__(self, model_params: dict):
         self.model_params = model_params
         self.physics = DegradationPhysics()
-
-    # --------------------------------------------------------------
+    
     def apply(self, cal_summary, cyc_summary, years=30, months_per_year=12):
         """
         Simulate degradation progression using Sparse DataFrame summaries.
@@ -94,7 +93,7 @@ class DegradationPredictor:
                 soh = 100.0 - q_loss_total
                 soh_traj.append(soh)
                 
-                total_days += 365.25 / months_per_year
+                total_days += 365 / months_per_year
                 time_axis.append(total_days)
                 cycle_axis.append(total_cycles)
 
@@ -127,7 +126,7 @@ if __name__ == "__main__":
     fitter = DegradationModelFitter()
     model_params = fitter.fit_degradation_models(storage_data_df, cycling_data_df)
     
-    utils.plot_cycling_extrapolation(cycling_data, model_params["cycling"]["params"], fitter.physics.extrapolate_cycling)
+    plot_cycling_extrapolation(cycling_data, model_params["cycling"]["params"], fitter.physics.extrapolate_cycling)
 
     # Predictor
     predictor = DegradationPredictor(model_params)

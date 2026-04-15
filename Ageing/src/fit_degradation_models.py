@@ -98,9 +98,9 @@ class DegradationModelFitter:
 
         # 3. Optimization Setup
         # [k_cal_LLI, Ea_LLI, beta_SOC, z_time]
-        p0 = [1e-4, 35000, 0.5, 0.6]
-        lb = [1e-8, 10000, 0.0, 0.5]
-        ub = [1.0,  80000, 2.0, 0.7]
+        p0 = [1e-3, 35000, 0.0, 0.6]
+        lb = [1e-7, 10000, -0.01, 0.6]
+        ub = [1e2,  80000, 0.01, 0.7]
 
         # Run optimization with automatic Jacobian scaling
         res = least_squares(residuals, p0, bounds=(lb, ub), x_scale='jac', ftol=1e-12)
@@ -183,8 +183,8 @@ class DegradationModelFitter:
         if model_type == "simple":
             # 3-param vector: [k_cyc, Ea, z]
             p0 = [1e-3, 35000, 0.9]
-            lb = [1e-7, 5000, 0.8]
-            ub = [1.0, 100000, 1.0]
+            lb = [1e-7, 5000, 0.89]
+            ub = [1.0, 100000, 0.91]
             param_names = param_names_simple
         
         elif model_type == "extended":
@@ -341,7 +341,7 @@ class DegradationModelFitter:
         R2 = 1 - (np.sum((Q_all - Q_pred)**2) / np.sum((Q_all - np.mean(Q_all))**2))
 
         # Plot fit
-        utils.plot_fit(Q_all, Q_pred, "Cycling ageing", rmse, R2, savepath=os.path.join(self.output_folder, f"{self.dataset}_cycling_fit.png"))
+        plot_fit(Q_all, Q_pred, "Cycling ageing", rmse, R2, savepath=os.path.join(self.output_folder, f"{self.dataset}_cycling_fit.png"))
 
         if model_type == "simple":
             param_names = ["k_cyc", "Ea", "z"]
@@ -442,7 +442,7 @@ class DegradationModelFitter:
 
         # Plot fit
         save_name = f"{self.dataset}_cycling_fixed_fit.png"
-        utils.plot_fit(Q_all, Q_pred, "Cycling Ageing (Fixed Exponents)", rmse, R2, 
+        plot_fit(Q_all, Q_pred, "Cycling Ageing (Fixed Exponents)", rmse, R2, 
                     savepath=os.path.join(self.output_folder, save_name))
 
         return {
@@ -487,7 +487,7 @@ if __name__ == "__main__":
         
         if model_params["calendar"] is not None:
             savepath = os.path.join(OUTPUT_PATH, f"{DATASET}_storage_extrapolations.png".replace("\\", "_"))
-            utils.plot_calendar_extrapolation(storage_data, model_params["calendar"]["params"], fitter.physics.extrapolate_calendar, savepath=savepath)
+            plot_calendar_extrapolation(storage_data, model_params["calendar"]["params"], fitter.physics.extrapolate_calendar, savepath=savepath)
         
         if model_params["cycling"] is not None:
             savepath = os.path.join(OUTPUT_PATH, f"{DATASET}_cycling_extrapolations_{CYCLING_MODEL_TYPE}.png".replace("\\", "_"))
@@ -496,6 +496,6 @@ if __name__ == "__main__":
                 physics_func = fitter.physics.extrapolate_cycling_simple
             else:
                 physics_func = fitter.physics.extrapolate_cycling
-            utils.plot_cycling_extrapolation(cycling_data, model_params["cycling"]["params"], CYCLING_MODEL_TYPE, physics_func, N_extrap=n_cycles, savepath=savepath)
+            plot_cycling_extrapolation(cycling_data, model_params["cycling"]["params"], CYCLING_MODEL_TYPE, physics_func, N_extrap=n_cycles, savepath=savepath)
 
     print("done")
